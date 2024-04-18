@@ -1,39 +1,66 @@
 import { EXAMPLE_VESTING_CONTRACT, WLD_ADDRESS } from "@/src/constants";
 import {
 	useReadVestingWalletEnd,
+	useReadVestingWalletOwner,
 	useReadVestingWalletReleasable,
 	useReadVestingWalletReleased,
 	useReadVestingWalletStart,
 	useReadVestingWalletVestedAmount,
+	useWriteVestingWalletRelease,
 } from "@/src/generated";
 import {
 	Box,
+	Button,
 	Container,
 	Flex,
+	FormControl,
+	FormHelperText,
+	FormLabel,
 	Heading,
+	Input,
+	Link,
 	Progress,
 	Stat,
 	StatGroup,
 	StatLabel,
 	StatNumber,
 	Text,
+	Tooltip,
 } from "@chakra-ui/react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Head from "next/head";
+import { useState } from "react";
+import { type Address, isAddress } from "viem";
+import { useAccount } from "wagmi";
 
 export default function Home() {
+	const [vestingContractAddressInput, setVestingContractAddress] =
+		useState<Address>(EXAMPLE_VESTING_CONTRACT);
+	const isValidAddress = isAddress(vestingContractAddressInput);
+
+	const vestingContractAddress = isValidAddress
+		? vestingContractAddressInput
+		: EXAMPLE_VESTING_CONTRACT;
+
+	const { data, writeContractAsync } = useWriteVestingWalletRelease();
+
+	const { data: owner } = useReadVestingWalletOwner({
+		address: vestingContractAddress,
+		args: [],
+	});
+
 	const { data: claimable } = useReadVestingWalletReleasable({
-		address: EXAMPLE_VESTING_CONTRACT,
+		address: vestingContractAddress,
 		args: [WLD_ADDRESS],
 	});
 
 	const { data: claimed } = useReadVestingWalletReleased({
-		address: EXAMPLE_VESTING_CONTRACT,
+		address: vestingContractAddress,
 		args: [WLD_ADDRESS],
 	});
 
 	const { data: totalBigInt } = useReadVestingWalletVestedAmount({
-		address: EXAMPLE_VESTING_CONTRACT,
+		address: vestingContractAddress,
 		args: [WLD_ADDRESS, BigInt(10 ** 18)],
 	});
 	const total = Math.round(
@@ -41,13 +68,13 @@ export default function Home() {
 	);
 
 	const { data: startBigInt } = useReadVestingWalletStart({
-		address: EXAMPLE_VESTING_CONTRACT,
+		address: vestingContractAddress,
 		args: [],
 	});
 	const start = Number(startBigInt);
 
 	const { data: endBigInt } = useReadVestingWalletEnd({
-		address: EXAMPLE_VESTING_CONTRACT,
+		address: vestingContractAddress,
 		args: [],
 	});
 	const end = Number(endBigInt);
@@ -55,6 +82,8 @@ export default function Home() {
 	const now = Date.now() / 1000;
 	const progress =
 		start === end ? (now > start ? 100 : 0) : (now - start) / (end - start);
+
+	const { address } = useAccount();
 
 	return (
 		<>
@@ -64,11 +93,57 @@ export default function Home() {
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
 				<link rel="icon" href="/favicon.ico" />
 			</Head>
-			<Container>
+			<Container maxW={"4xl"}>
 				<Flex mt={10} mb={10} justify="space-between">
 					<Heading>WLD Vesting</Heading>
 					<ConnectButton />
 				</Flex>
+
+				<FormControl my={3}>
+					<FormLabel>Vesting Contract Address</FormLabel>
+					<Flex alignItems="center" justifyContent="stretch" gap={5}>
+						<Input
+							placeholder={"Enter vesting contract address"}
+							value={vestingContractAddress}
+							onChange={(e) =>
+								setVestingContractAddress(e.target.value as Address)
+							}
+						/>
+						<Button px={8}>Example contract</Button>
+					</Flex>
+				</FormControl>
+
+				<Flex mb={10} alignItems="end" justifyContent="start" gap={1}>
+					Vesting a total of
+					<Text>{total.toLocaleString()} WLD</Text>
+					to{" "}
+					<Link
+						textDecor={"underline"}
+						href={`https://optimistic.etherscan.io/address/${owner}`}
+					>
+						{owner}
+					</Link>
+				</Flex>
+
+				<Tooltip
+					isDisabled={owner === address}
+					label={"Please connect the owner address to claim"}
+				>
+					<Button
+						mb={10}
+						isDisabled={!(claimable && claimable > 0n)}
+						colorScheme={owner !== address ? "orange" : "green"}
+						onClick={() => {
+							writeContractAsync({
+								address: vestingContractAddress,
+								args: [WLD_ADDRESS],
+							});
+						}}
+					>
+						Claim {claimable?.toString()} WLD
+					</Button>
+				</Tooltip>
+
 				<Box>
 					<StatGroup>
 						<Stat>
@@ -87,12 +162,14 @@ export default function Home() {
 
 					<Box mt="8">
 						<Text fontSize="xl">Vesting Period</Text>
-						<Text fontSize="md">
-							Starts: {new Date(start * 1000).toLocaleString()}
-						</Text>
-						<Text fontSize="md">
-							Ends: {new Date(end * 1000).toLocaleString()}
-						</Text>
+						<Flex justifyContent="space-between">
+							<Text fontSize="md">
+								Starts: {new Date(start * 1000).toLocaleString()}
+							</Text>
+							<Text fontSize="md">
+								Ends: {new Date(end * 1000).toLocaleString()}
+							</Text>
+						</Flex>
 						<Progress
 							hasStripe={true}
 							colorScheme="green"
