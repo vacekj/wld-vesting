@@ -1,15 +1,60 @@
 import { EXAMPLE_VESTING_CONTRACT, WLD_ADDRESS } from "@/src/constants";
-import { useReadVestingWalletReleasable } from "@/src/generated";
-import { Container, Heading } from "@chakra-ui/react";
+import {
+	useReadVestingWalletEnd,
+	useReadVestingWalletReleasable,
+	useReadVestingWalletReleased,
+	useReadVestingWalletStart,
+	useReadVestingWalletVestedAmount,
+} from "@/src/generated";
+import {
+	Box,
+	Container,
+	Flex,
+	Heading,
+	Progress,
+	Stat,
+	StatGroup,
+	StatLabel,
+	StatNumber,
+	Text,
+} from "@chakra-ui/react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Head from "next/head";
-import { stringify } from "viem";
 
 export default function Home() {
-	const { data, error, isLoading } = useReadVestingWalletReleasable({
+	const { data: claimable } = useReadVestingWalletReleasable({
 		address: EXAMPLE_VESTING_CONTRACT,
 		args: [WLD_ADDRESS],
 	});
+
+	const { data: claimed } = useReadVestingWalletReleased({
+		address: EXAMPLE_VESTING_CONTRACT,
+		args: [WLD_ADDRESS],
+	});
+
+	const { data: totalBigInt } = useReadVestingWalletVestedAmount({
+		address: EXAMPLE_VESTING_CONTRACT,
+		args: [WLD_ADDRESS, BigInt(10 ** 18)],
+	});
+	const total = Math.round(
+		Number((totalBigInt ?? 0n) - (claimed ?? 0n)) / 10 ** 18,
+	);
+
+	const { data: startBigInt } = useReadVestingWalletStart({
+		address: EXAMPLE_VESTING_CONTRACT,
+		args: [],
+	});
+	const start = Number(startBigInt);
+
+	const { data: endBigInt } = useReadVestingWalletEnd({
+		address: EXAMPLE_VESTING_CONTRACT,
+		args: [],
+	});
+	const end = Number(endBigInt);
+
+	const now = Date.now() / 1000;
+	const progress =
+		start === end ? (now > start ? 100 : 0) : (now - start) / (end - start);
 
 	return (
 		<>
@@ -20,9 +65,43 @@ export default function Home() {
 				<link rel="icon" href="/favicon.ico" />
 			</Head>
 			<Container>
-				<Heading>WLD Vesting</Heading>
-				<ConnectButton />
-				<div>Releasable: {data?.toString()} WLD</div>
+				<Flex mt={10} mb={10} justify="space-between">
+					<Heading>WLD Vesting</Heading>
+					<ConnectButton />
+				</Flex>
+				<Box>
+					<StatGroup>
+						<Stat>
+							<StatLabel>Claimed</StatLabel>
+							<StatNumber>{Number(claimed)} WLD</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Claimable</StatLabel>
+							<StatNumber>{Number(claimable)} WLD</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Unclaimed</StatLabel>
+							<StatNumber>{Number(total)} WLD</StatNumber>
+						</Stat>
+					</StatGroup>
+
+					<Box mt="8">
+						<Text fontSize="xl">Vesting Period</Text>
+						<Text fontSize="md">
+							Starts: {new Date(start * 1000).toLocaleString()}
+						</Text>
+						<Text fontSize="md">
+							Ends: {new Date(end * 1000).toLocaleString()}
+						</Text>
+						<Progress
+							hasStripe={true}
+							colorScheme="green"
+							size="lg"
+							value={progress}
+							mt="4"
+						/>
+					</Box>
+				</Box>
 			</Container>
 		</>
 	);
