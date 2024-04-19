@@ -1,3 +1,4 @@
+import { config } from "@/src/config";
 import { EXAMPLE_VESTING_CONTRACT, WLD_ADDRESS } from "@/src/constants";
 import {
 	useReadVestingWalletEnd,
@@ -26,12 +27,14 @@ import {
 	StatNumber,
 	Text,
 	Tooltip,
+	VStack,
 } from "@chakra-ui/react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Head from "next/head";
 import { useState } from "react";
-import { type Address, isAddress } from "viem";
-import { useAccount } from "wagmi";
+import useSWR from "swr";
+import { type Address, isAddress, parseAbiItem } from "viem";
+import { useAccount, usePublicClient } from "wagmi";
 
 export default function Home() {
 	const [vestingContractAddressInput, setVestingContractAddress] =
@@ -84,6 +87,23 @@ export default function Home() {
 		start === end ? (now > start ? 100 : 0) : (now - start) / (end - start);
 
 	const { address } = useAccount();
+	const publicClient = usePublicClient({ config });
+	const { data: claims } = useSWR(
+		[vestingContractAddressInput, address],
+		async () => {
+			const logs = await publicClient?.getLogs({
+				address: vestingContractAddress,
+				event: parseAbiItem(
+					"event ERC20Released(address indexed token, uint256 amount)",
+				),
+				args: {},
+				fromBlock: 118934400n,
+				toBlock: 118934402n,
+			});
+			return logs?.filter((log) => log.args.amount !== 0n);
+			// return logs;
+		},
+	);
 
 	return (
 		<>
@@ -104,7 +124,7 @@ export default function Home() {
 					<Flex alignItems="center" justifyContent="stretch" gap={5}>
 						<Input
 							placeholder={"Enter vesting contract address"}
-							value={vestingContractAddress}
+							value={vestingContractAddressInput}
 							onChange={(e) =>
 								setVestingContractAddress(e.target.value as Address)
 							}
@@ -178,6 +198,17 @@ export default function Home() {
 							mt="4"
 						/>
 					</Box>
+
+					<VStack>
+						{claims?.map((claim) => {
+							return (
+								<div key={claim.blockHash}>
+									{claim.args.amount?.toString()} at block{" "}
+									{claim.blockNumber.toString()}
+								</div>
+							);
+						})}
+					</VStack>
 				</Box>
 			</Container>
 		</>
