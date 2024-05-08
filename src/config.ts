@@ -8,7 +8,7 @@ export const config = getDefaultConfig({
 	chains: [optimism],
 	transports: {
 		[optimism.id]: http(
-			"https://optimism-mainnet.infura.io/v3/dca3b3f8ffa84b8c99987faf694cde1f",
+			"https://opt-mainnet.g.alchemy.com/v2/B7L75BbBgi5gKJqq-rcsrI20LwyCB6jr",
 		),
 	},
 	ssr: true,

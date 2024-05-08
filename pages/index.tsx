@@ -5,7 +5,6 @@ import {
 	useReadVestingWalletOwner,
 	useReadVestingWalletReleasable,
 	useReadVestingWalletReleased,
-	useReadVestingWalletStart,
 	useReadVestingWalletVestedAmount,
 	useWriteVestingWalletRelease,
 } from "@/src/generated";
@@ -15,7 +14,6 @@ import {
 	Container,
 	Flex,
 	FormControl,
-	FormHelperText,
 	FormLabel,
 	Heading,
 	Input,
@@ -35,10 +33,12 @@ import { useState } from "react";
 import useSWR from "swr";
 import {
 	type Address,
+	erc20Abi,
 	formatEther,
+	getAddress,
 	isAddress,
 	parseAbiItem,
-	stringify,
+	zeroAddress,
 } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 
@@ -51,7 +51,7 @@ export default function Home() {
 		? vestingContractAddressInput
 		: EXAMPLE_VESTING_CONTRACT;
 
-	const { data, writeContractAsync } = useWriteVestingWalletRelease();
+	const { writeContractAsync } = useWriteVestingWalletRelease();
 
 	const { data: owner } = useReadVestingWalletOwner({
 		address: vestingContractAddress,
@@ -76,23 +76,41 @@ export default function Home() {
 		Number((totalBigInt ?? 0n) - (claimed ?? 0n)) / 10 ** 18,
 	);
 
-	const { data: startBigInt } = useReadVestingWalletStart({
-		address: vestingContractAddress,
-		args: [],
-	});
-	const start = Number(startBigInt);
-
 	const { data: endBigInt } = useReadVestingWalletEnd({
 		address: vestingContractAddress,
 		args: [],
 	});
 	const end = Number(endBigInt);
+	const { address } = useAccount();
+	/* We need to get the approximate time a contract was created - we get the time the WLD was transferred in instead */
+	const { data: deployedAt } = useSWR(
+		[vestingContractAddressInput, address, "3"],
+		async () => {
+			const logs = await publicClient.getContractEvents({
+				abi: erc20Abi,
+				address: WLD_ADDRESS,
+				eventName: "Transfer",
+				fromBlock: "earliest",
+				toBlock: "latest",
+				args: {
+					from: null,
+					to: getAddress(vestingContractAddress),
+				},
+			});
+
+			const block = await publicClient.getBlock({
+				blockNumber: logs[0].blockNumber,
+			});
+
+			return Number(block.timestamp);
+		},
+	);
+	const start = deployedAt ?? 0;
 
 	const now = Date.now() / 1000;
-	const progress =
-		start === end ? (now > start ? 100 : 0) : (now - start) / (end - start);
+	const progress = (now - start) / (end - start);
+	console.log(progress);
 
-	const { address } = useAccount();
 	const publicClient = usePublicClient({ config });
 	const { data: claims } = useSWR(
 		[vestingContractAddressInput, address],
@@ -107,7 +125,6 @@ export default function Home() {
 				toBlock: "latest",
 			});
 			return logs?.filter((log) => log.args.amount !== 0n);
-			// return logs;
 		},
 	);
 
@@ -187,6 +204,25 @@ export default function Home() {
 							<StatNumber>{Number(total)} WLD</StatNumber>
 						</Stat>
 					</StatGroup>
+
+					<Box mt="8">
+						<Text fontSize="xl">Vesting Period</Text>
+						<Flex justifyContent="space-between">
+							<Text fontSize="md">
+								Starts: {new Date(start * 1000).toLocaleString()}
+							</Text>
+							<Text fontSize="md">
+								Ends: {new Date(end * 1000).toLocaleString()}
+							</Text>
+						</Flex>
+						<Progress
+							hasStripe={true}
+							colorScheme="green"
+							size="lg"
+							value={progress * 100}
+							mt="4"
+						/>
+					</Box>
 
 					<Heading as={"h3"} fontSize={"xl"} mt={10}>
 						Claims
