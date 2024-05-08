@@ -33,7 +33,13 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Head from "next/head";
 import { useState } from "react";
 import useSWR from "swr";
-import { type Address, isAddress, parseAbiItem } from "viem";
+import {
+	type Address,
+	formatEther,
+	isAddress,
+	parseAbiItem,
+	stringify,
+} from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 
 export default function Home() {
@@ -97,8 +103,8 @@ export default function Home() {
 					"event ERC20Released(address indexed token, uint256 amount)",
 				),
 				args: {},
-				fromBlock: 118934400n,
-				toBlock: 118934402n,
+				fromBlock: "earliest",
+				toBlock: "latest",
 			});
 			return logs?.filter((log) => log.args.amount !== 0n);
 			// return logs;
@@ -168,7 +174,9 @@ export default function Home() {
 					<StatGroup>
 						<Stat>
 							<StatLabel>Claimed</StatLabel>
-							<StatNumber>{Number(claimed)} WLD</StatNumber>
+							<StatNumber>
+								{Number((claimed ?? 0n) / 10n ** 18n)} WLD
+							</StatNumber>
 						</Stat>
 						<Stat>
 							<StatLabel>Claimable</StatLabel>
@@ -180,31 +188,25 @@ export default function Home() {
 						</Stat>
 					</StatGroup>
 
-					<Box mt="8">
-						<Text fontSize="xl">Vesting Period</Text>
-						<Flex justifyContent="space-between">
-							<Text fontSize="md">
-								Starts: {new Date(start * 1000).toLocaleString()}
-							</Text>
-							<Text fontSize="md">
-								Ends: {new Date(end * 1000).toLocaleString()}
-							</Text>
-						</Flex>
-						<Progress
-							hasStripe={true}
-							colorScheme="green"
-							size="lg"
-							value={progress}
-							mt="4"
-						/>
-					</Box>
-
-					<VStack>
+					<Heading as={"h3"} fontSize={"xl"} mt={10}>
+						Claims
+					</Heading>
+					<VStack justifyContent="start" alignItems={"start"} gap={1}>
 						{claims?.map((claim) => {
 							return (
 								<div key={claim.blockHash}>
-									{claim.args.amount?.toString()} at block{" "}
-									{claim.blockNumber.toString()}
+									{formatEther(claim.args.amount ?? 0n)} WLD in tx{" "}
+									<Link
+										target={"_blank"}
+										href={`https://optimistic.etherscan.io/tx/${claim.transactionHash}`}
+										rel="noreferrer"
+										textDecor={"underline"}
+									>
+										{`${claim.transactionHash.slice(
+											0,
+											4,
+										)}...${claim.transactionHash.slice(60)}`}
+									</Link>
 								</div>
 							);
 						})}
