@@ -138,7 +138,16 @@ export default function Home() {
 			</Head>
 			<Container maxW={"4xl"}>
 				<Flex mt={10} mb={10} justify="space-between">
-					<Heading>WLD Vesting</Heading>
+					<Heading>
+						WLD Vesting
+						<Link
+							as={"div"}
+							fontSize={"medium"}
+							href={"https://x.com/atris_eth"}
+						>
+							by Josef (atris)
+						</Link>
+					</Heading>
 					<ConnectButton />
 				</Flex>
 
@@ -183,7 +192,7 @@ export default function Home() {
 							});
 						}}
 					>
-						Claim {claimable?.toString()} WLD
+						Claim {Number((claimable ?? 0n) / 10n ** 18n)} WLD
 					</Button>
 				</Tooltip>
 
